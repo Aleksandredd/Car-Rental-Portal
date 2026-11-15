@@ -3,9 +3,8 @@
 - Base URL: `https://rentcar.stepprojects.ge`
 - Spec: [api_spec.json](api_spec.json) (OpenAPI 3.0.1, downloaded from `/swagger/v1/swagger.json`)
 - API source: https://github.com/Lashvardi/Rent-Car-API (Controllers + DTO)
-- Sources for this file: the spec, the controller source code, and live read-only (GET) probes.
-  POST endpoints have **not** been called yet; their response shapes below come from the source code and
-  are marked "(from source)". They get confirmed before the matching page is built.
+- Sources for this file: the spec, the controller source code, and live calls to every endpoint we use
+  (GET and POST), made with test accounts.
 
 ## Auth
 
@@ -49,31 +48,31 @@ Login returns a JWT `token` (valid 1 day), but nothing ever asks for it. The API
 | GET | `/api/Car/cities` | none | `[string]`, distinct cities. Contains `null`, duplicates in different spellings and junk; needs cleaning. |
 | GET | `/api/Car/byPhone` | query `PhoneNumber` | `[Car]` where `createdBy` equals the phone. **404 when the user has no cars.** |
 | GET | `/api/Car/{id}` | path `id` | `Car`, or 404 problem JSON. |
-| POST | `/api/Car` | `multipart/form-data`: `Brand`, `Model`, `Year`, `Price`, `Capacity`, `Transmission`, `CreatedBy`, `City`, `CreatedByEmail`, `FuelCapacity`, `Image1`, `Image2`, `Image3` (files), `Latitude`, `Longitude` | 201 with the created `Car` (from source). Images must end in `.jpg`, `.png` or `.jpeg`; other files are silently dropped. |
+| POST | `/api/Car` | `multipart/form-data`: `Brand`, `Model`, `Year`, `Price`, `Capacity`, `Transmission`, `CreatedBy`, `City`, `CreatedByEmail`, `FuelCapacity`, `Image1`, `Image2`, `Image3` (files), `Latitude`, `Longitude` | 201 with the created `Car`. Images must end in `.jpg`, `.png` or `.jpeg`; other files are silently dropped. |
 
 ## Users
 
 | Method | Path | Input | Response |
 |---|---|---|---|
-| POST | `/api/Users/register` | JSON `UserDTO`: `phoneNumber`, `password`, `email`, `firstName`, `lastName`, `role` | `User` object (from source). 400 text `User already exists`. The API sends a welcome email to `email`. `role` is ignored (always `"User"`). |
-| POST | `/api/Users/login` | JSON `UserDTO` (only `phoneNumber` + `password` are used) | `{ token, firstName, lastName, role, phoneNumber, email }` (from source). 400 text `User Not Found!` or `Wrong Password`. |
+| POST | `/api/Users/register` | JSON `UserDTO`: `phoneNumber`, `password`, `email`, `firstName`, `lastName`, `role` | `User` object. 400 text `User already exists`. The API sends a welcome email to `email`. `role` is ignored (always `"User"`). |
+| POST | `/api/Users/login` | JSON `UserDTO` (only `phoneNumber` + `password` are used) | `{ token, firstName, lastName, role, phoneNumber, email }`. 400 text `User Not Found!` or `Wrong Password`. Note: an account with an empty phone and empty password exists on the live API, so empty values must be rejected on our side. |
 | GET | `/api/Users/{phoneNumber}` | path | `User`: `phoneNumber`, `email`, `firstName`, `lastName`, `role`, `favoriteCars`, `message` (it also returns `passwordHash` / `passwordSalt`, which we must never display or store). 404 if unknown. |
-| GET | `/api/Users/{phoneNumber}/favorite-cars` | path | `[Car]` (from source). 404 text `User not found`. |
-| POST | `/api/Users/{userId}/favorites/{carId}` | path; `userId` is the phone number | 200 with empty body (from source). 404 text `User not found` / `Car not found`. |
+| GET | `/api/Users/{phoneNumber}/favorite-cars` | path | `[Car]`. 404 text `User not found`. |
+| POST | `/api/Users/{userId}/favorites/{carId}` | path; `userId` is the phone number | 200 with empty body. 404 text `User not found` / `Car not found`. |
 
 ## Renting
 
 | Method | Path | Input | Response |
 |---|---|---|---|
-| POST | `/Purchase/purchase` | query `phoneNumber`, `carId`, `multiplier` (number of days, default 1) | Ticket (from source): the car's fields plus `dayPrice` and `pricePaid` (= price × multiplier). 400 text `Car not found`. |
-| GET | `/Purchase/{phoneNumber}` | path | `[ { carId, carBrand, carModel, city, multiplier, pricePaid } ]` (from source). When there are none: **200 with the plain text `No products`**, not JSON. |
+| POST | `/Purchase/purchase` | query `phoneNumber`, `carId`, `multiplier` (number of days, default 1) | Ticket: the car's fields plus `dayPrice` and `pricePaid` (= price × multiplier). 400 text `Car not found`. |
+| GET | `/Purchase/{phoneNumber}` | path | `[ { carId, carBrand, carModel, city, multiplier, pricePaid } ]`. When there are none: **200 with the plain text `No products`**, not JSON. |
 
 ## Messages (notifications)
 
 | Method | Path | Input | Response |
 |---|---|---|---|
-| GET | `/Message/Messages` | query `phoneNumber` | `[string]`, the message texts (from source). 400 text `User not found`. |
-| POST | `/Message/Message` | query `phoneNumber` (the receiver), `CarId` | `{ id, messageText }` with a random text such as "Hey Someone Rented Your BMW/X5" (from source). 400 text `User not found`. |
+| GET | `/Message/Messages` | query `phoneNumber` | `[string]`, the message texts. 400 text `User not found`. |
+| POST | `/Message/Message` | query `phoneNumber` (the receiver), `CarId` | `{ id, messageText }` with a random text such as "Hey Someone Rented Your BMW/X5". 400 text `User not found`. |
 
 The API does **not** create a message by itself when a car is rented. Our app has to call
 `POST /Message/Message` with the owner's phone (`car.createdBy`) right after a successful purchase.
@@ -82,10 +81,14 @@ The API does **not** create a message by itself when a car is rented. Our app ha
 
 1. **"Approved cars"**: the API has no approval concept. The closest real feature is favorites
    (`favorite-cars` + `favorites/{carId}`).
-2. **Uploaded photos**: the API source builds photo URLs on `rentcar.webwide.ge`, a domain that no longer
-   resolves, and every recently added car in the live data has `imageUrl1..3 = null`. Photos sent to the API
-   may not come back as working URLs. To be confirmed with one real test upload.
+2. **Uploaded photos do not work on the live API.** Any `POST /api/Car` that contains an image answers
+   500 (`UnauthorizedAccessException`: the server cannot write to its `Uploads` folder). The same request
+   without images succeeds. The API source also builds photo URLs on `rentcar.webwide.ge`, a domain that no
+   longer resolves. Workaround: the app tries with photos first, retries without them on a 5xx, and keeps
+   local copies in `media/cars/<id>/` which it shows instead.
 3. **Popular cars** are random on the server side, so the two home sections differ only in size (4 vs 12).
 4. **No edit/delete** endpoints for cars or users, no logout endpoint (logout = clear the Django session).
-5. **Data quality**: cities and transmissions are free text. Our own form will send clean values
+5. **Seed photos**: the seed cars use `loremflickr.com` image URLs, which currently answer 500, so those
+   cars show the placeholder image.
+6. **Data quality**: cities and transmissions are free text. Our own form will send clean values
    (`Automatic` / `Manual` / `Tiptronic`), and templates must tolerate `null` everywhere.
