@@ -1,0 +1,58 @@
+{% extends 'base.html' %}
+{% load static %}
+{% block title %}Add car | Car Rental Portal{% endblock %}
+
+{% block content %}
+<div class="row justify-content-center">
+  <div class="col-12 col-lg-9 col-xl-8">
+    <h1 class="h3 mb-1">Add your car</h1>
+    <p class="text-secondary mb-4">
+      It will be listed under your phone number, <strong>{{ current_user.phone }}</strong>.
+    </p>
+
+    <form method="post" enctype="multipart/form-data" class="card" id="addCarForm" novalidate>
+      <div class="card-body p-4">
+        {% csrf_token %}
+        {{ form.latitude }}
+        {{ form.longitude }}
+        {% for error in form.non_field_errors %}
+          <div class="alert alert-danger py-2">{{ error }}</div>
+        {% endfor %}
+
+        <div class="row">
+          <div class="col-sm-6">{% include '_form_field.html' with field=form.brand %}</div>
+          <div class="col-sm-6">{% include '_form_field.html' with field=form.model %}</div>
+          <div class="col-sm-6">{% include '_form_field.html' with field=form.year %}</div>
+          <div class="col-sm-6">{% include '_form_field.html' with field=form.price %}</div>
+          <div class="col-sm-6">{% include '_form_field.html' with field=form.capacity %}</div>
+          <div class="col-sm-6">{% include '_form_field.html' with field=form.transmission %}</div>
+          <div class="col-sm-6">{% include '_form_field.html' with field=form.city %}</div>
+          <div class="col-sm-6">{% include '_form_field.html' with field=form.fuel_capacity %}</div>
+        </div>
+        <datalist id="city-list">
+          {% for city in cities %}<option value="{{ city }}">{% endfor %}
+        </datalist>
+
+        <h2 class="h6 mt-2">Photos</h2>
+        <p class="form-text mt-0">Three photos, .png, .jpg or .jpeg only.</p>
+        <div class="row">
+          <div class="col-md-4">{% include '_form_field.html' with field=form.image1 %}</div>
+          <div class="col-md-4">{% include '_form_field.html' with field=form.image2 %}</div>
+          <div class="col-md-4">{% include '_form_field.html' with field=form.image3 %}</div>
+        </div>
+
+        <p class="small text-secondary" id="locationStatus" aria-live="polite">
+          <i class="bi bi-geo-alt me-1"></i>Checking your location...
+        </p>
+
+        <button type="submit" class="btn btn-accent btn-lg">Add car</button>
+        <a href="{% url 'home' %}" class="btn btn-link text-secondary">Cancel</a>
+      </div>
+    </form>
+  </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+  <script src="{% static 'js/geolocation.js' %}"></script>
+{% endblock %}
