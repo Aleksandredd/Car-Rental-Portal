@@ -34,7 +34,7 @@ _Add screenshots here, for example:_
 Requires Python 3.12 or newer.
 
 ```bash
-git clone https://github.com/<your-username>/car-rental-portal.git
+git clone https://github.com/Aleksandredd/car-rental-portal.git
 cd car-rental-portal
 
 python -m venv venv
