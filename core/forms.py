@@ -6,7 +6,7 @@ from django.conf import settings
 from django.core.validators import MaxValueValidator
 
 PHONE_RE = re.compile(r'^\+?\d{9,15}$')
-NAME_RE = re.compile(r"^[^\W\d_]+(?:[ '\-][^\W\d_]+)*$")  # letters in any alphabet
+NAME_RE = re.compile(r"^[^\W\d_]+(?:[ '\-][^\W\d_]+)*$")
 
 ALLOWED_PHOTO_EXTENSIONS = ('.png', '.jpg', '.jpeg')
 MAX_RENT_DAYS = 30
@@ -19,9 +19,8 @@ TRANSMISSION_CHOICES = [
 ]
 
 
+# adds bootstrap classes to inputs
 class BootstrapFormMixin:
-    """Give every widget the right Bootstrap class and mark invalid fields."""
-
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
         for name, field in self.fields.items():
@@ -34,8 +33,8 @@ class BootstrapFormMixin:
             widget.attrs['class'] = (widget.attrs.get('class', '') + ' ' + css).strip()
 
 
+# remove spaces and dashes from phone
 def clean_phone(value):
-    """Accept '+995 555 12-34-56' style input and store digits only (plus optional +)."""
     phone = re.sub(r'[\s\-()]', '', value or '')
     if not PHONE_RE.match(phone):
         raise forms.ValidationError('Enter a valid phone number: 9 to 15 digits, e.g. 555123456.')
@@ -51,10 +50,7 @@ def clean_name(value, label):
     return name
 
 
-# --------------------------------------------------------------------------
-# Auth
-# --------------------------------------------------------------------------
-
+# auth forms
 class RegisterForm(BootstrapFormMixin, forms.Form):
     first_name = forms.CharField(label='First name', max_length=50,
                                  widget=forms.TextInput(attrs={'autocomplete': 'given-name'}))
@@ -99,16 +95,12 @@ class LoginForm(BootstrapFormMixin, forms.Form):
         return clean_phone(self.cleaned_data['phone'])
 
 
-# --------------------------------------------------------------------------
-# Cars
-# --------------------------------------------------------------------------
-
 def max_car_year():
     return datetime.date.today().year + 1
 
 
+# car forms
 class FilterForm(BootstrapFormMixin, forms.Form):
-    """All fields optional: any subset of filters is valid."""
 
     city = forms.CharField(label='City', required=False, max_length=100, widget=forms.Select())
     start_year = forms.IntegerField(label='Year from', required=False, min_value=1900, max_value=2100,
@@ -121,7 +113,6 @@ class FilterForm(BootstrapFormMixin, forms.Form):
     def __init__(self, *args, cities=(), **kwargs):
         super().__init__(*args, **kwargs)
         choices = [('', 'Any city')] + [(city, city) for city in cities]
-        # Keep a city that came from the URL even if it is not in our cleaned list.
         selected = (self.data.get('city') or '').strip() if self.is_bound else ''
         if selected and selected not in cities:
             choices.append((selected, selected))
@@ -145,13 +136,12 @@ class RentForm(forms.Form):
 
 
 def validate_photo(photo):
-    """Server-side check: .png/.jpg/.jpeg only, real image bytes, sensible size."""
     name = (photo.name or '').lower()
     if not name.endswith(ALLOWED_PHOTO_EXTENSIONS):
         raise forms.ValidationError('Only .png, .jpg and .jpeg photos are allowed.')
     if photo.size > settings.MAX_PHOTO_SIZE:
         raise forms.ValidationError(f'The photo is too large (max {settings.MAX_PHOTO_SIZE // (1024 * 1024)} MB).')
-    # Don't trust the extension alone: check the file signature too.
+    # check that file is really png or jpg
     header = photo.read(8)
     photo.seek(0)
     is_png = header.startswith(b'\x89PNG\r\n\x1a\n')
@@ -181,7 +171,7 @@ class AddCarForm(BootstrapFormMixin, forms.Form):
     image3 = forms.FileField(label='Photo 3', validators=[validate_photo],
                              widget=forms.ClearableFileInput(attrs=photo_attrs))
 
-    # Filled by static/js/geolocation.js; never typed by the user.
+    # filled from js (geolocation)
     latitude = forms.CharField(required=False, widget=forms.HiddenInput())
     longitude = forms.CharField(required=False, widget=forms.HiddenInput())
 
@@ -206,8 +196,7 @@ class AddCarForm(BootstrapFormMixin, forms.Form):
 
     def clean(self):
         cleaned = super().clean()
-        # The location is optional and invisible to the user, so a missing or
-        # broken value must never block the form: we simply send no location.
+        # location is optional
         try:
             lat, lng = float(cleaned.get('latitude')), float(cleaned.get('longitude'))
             if not (-90 <= lat <= 90 and -180 <= lng <= 180):

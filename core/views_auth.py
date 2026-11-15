@@ -8,8 +8,8 @@ from .api_client import ApiError
 from .forms import LoginForm, RegisterForm
 
 
+# page to open after login
 def _safe_next(request):
-    """Return the ?next= target only if it points back to this site."""
     target = request.POST.get('next') or request.GET.get('next') or ''
     if target and url_has_allowed_host_and_scheme(target, allowed_hosts={request.get_host()},
                                                   require_https=request.is_secure()):
@@ -59,7 +59,7 @@ def login(request):
                 messages.error(request, exc.message)
         else:
             next_url = _safe_next(request)
-            request.session.cycle_key()  # new session id after login
+            request.session.cycle_key()
             request.session['api_token'] = data.get('token')
             request.session['user'] = {
                 'phone': data.get('phoneNumber') or form.cleaned_data['phone'],

@@ -18,12 +18,11 @@ logger = logging.getLogger(__name__)
 FILTER_PAGE_SIZE = 12
 
 
+# call api function, show error message if it fails
 def _try(request, func, *args, default=None, **kwargs):
-    """Run one API call; on failure flash a friendly message and return `default`."""
     try:
         return func(*args, **kwargs)
     except ApiError as exc:
-        # Show each distinct problem once, even if several calls on a page fail.
         shown = request.__dict__.setdefault('_api_errors_shown', set())
         if exc.message not in shown:
             shown.add(exc.message)
@@ -31,14 +30,10 @@ def _try(request, func, *args, default=None, **kwargs):
         return [] if default is None else default
 
 
-# --------------------------------------------------------------------------
-# Browsing
-# --------------------------------------------------------------------------
-
 def home(request):
     popular = _try(request, api_client.get_popular_cars)
     random_cars = _try(request, api_client.get_random_cars)
-    # Don't show the same car in both sections.
+    # no same car in both sections
     popular_ids = {car['id'] for car in popular}
     random_cars = [car for car in random_cars if car['id'] not in popular_ids]
     return render(request, 'home.html', {'popular_cars': popular, 'random_cars': random_cars})
@@ -46,7 +41,6 @@ def home(request):
 
 def filter_cars(request):
     cities = _try(request, api_client.get_cities)
-    # The form is "bound" only when the user actually submitted something.
     submitted = any(request.GET.get(key) for key in ('city', 'start_year', 'end_year', 'capacity'))
     form = FilterForm(request.GET if submitted else None, cities=cities)
 
@@ -69,7 +63,7 @@ def filter_cars(request):
             default=result,
         )
 
-    # Query string without "page", for the pagination links.
+    # for pagination links
     query = request.GET.copy()
     query.pop('page', None)
     return render(request, 'filter.html', {
@@ -111,10 +105,6 @@ def car_detail(request, car_id):
     })
 
 
-# --------------------------------------------------------------------------
-# Actions on a car (logged-in only)
-# --------------------------------------------------------------------------
-
 @require_POST
 @session_login_required
 def car_rent(request, car_id):
@@ -136,8 +126,7 @@ def car_rent(request, car_id):
         messages.error(request, f'The car could not be rented: {exc.message}')
         return redirect('car_detail', car_id=car_id)
 
-    # The API does not notify the owner by itself, so we do it here.
-    # Old cars often have no registered owner; that must not break the rental.
+    # send message to car owner
     owner_phone = car.get('createdBy')
     if owner_phone:
         try:
@@ -156,10 +145,10 @@ def car_rent(request, car_id):
     return redirect('profile')
 
 
+# approve = add to favorites in api
 @require_POST
 @session_login_required
 def car_approve(request, car_id):
-    """ "Approve" a car = add it to the user's favourites on the API."""
     user = request.session['user']
     try:
         already = any(car.get('id') == car_id for car in api_client.get_favorite_cars(user['phone']))
@@ -173,13 +162,8 @@ def car_approve(request, car_id):
     return redirect('car_detail', car_id=car_id)
 
 
+# save photos in media folder because api does not keep them
 def _save_local_photos(car_id, photos):
-    """
-    Keep our own copy of the uploaded photos in media/cars/<id>/.
-
-    The API's image hosting is unreliable (it can return no URL at all), so
-    api_client.clean_car() falls back to these copies when showing a car.
-    """
     folder = Path(settings.MEDIA_ROOT) / 'cars' / str(car_id)
     try:
         folder.mkdir(parents=True, exist_ok=True)
@@ -208,10 +192,9 @@ def car_add(request):
             'Transmission': data['transmission'],
             'City': data['city'],
             'FuelCapacity': data['fuel_capacity'],
-            # Owner details always come from the session, never from the form.
+            # owner phone from session
             'CreatedBy': user['phone'],
             'CreatedByEmail': user.get('email', ''),
-            # Filled by the browser's Geolocation API; missing if the user said no.
             'Latitude': data['latitude'],
             'Longitude': data['longitude'],
         }
@@ -230,10 +213,6 @@ def car_add(request):
     cities = _try(request, api_client.get_cities) if request.method == 'GET' else []
     return render(request, 'car_add.html', {'form': form, 'cities': cities})
 
-
-# --------------------------------------------------------------------------
-# The user's own pages
-# --------------------------------------------------------------------------
 
 @session_login_required
 def profile(request):

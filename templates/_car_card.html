@@ -1,5 +1,5 @@
 {% load static %}
-{# Reusable car card. Usage: {% include '_car_card.html' with car=car %} #}
+{# car card, used on home, filter and profile pages #}
 <div class="card car-card h-100">
   <a href="{% url 'car_detail' car.id %}" class="car-card-photo" tabindex="-1" aria-hidden="true">
     <img src="{% if car.cover %}{{ car.cover }}{% else %}{% static 'img/no-photo.svg' %}{% endif %}"

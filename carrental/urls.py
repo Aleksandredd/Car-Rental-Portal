@@ -6,6 +6,5 @@ urlpatterns = [
     path('', include('core.urls')),
 ]
 
-# Local copies of uploaded car photos (development server only).
 if settings.DEBUG:
     urlpatterns += static(settings.MEDIA_URL, document_root=settings.MEDIA_ROOT)

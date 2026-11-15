@@ -1,11 +1,4 @@
-"""
-The single place where the app talks to the external RentCar REST API.
-
-One function per endpoint (see docs/API_NOTES.md). Every function either
-returns clean Python data or raises ApiError with a message that is safe
-to show to the user. Views never use `requests` directly.
-"""
-
+# all requests to the rentcar api are in this file
 import logging
 from pathlib import Path
 from urllib.parse import quote
@@ -19,20 +12,14 @@ PHOTO_FIELDS = ('imageUrl1', 'imageUrl2', 'imageUrl3')
 
 
 class ApiError(Exception):
-    """Raised when the API is unreachable or answers with an error."""
-
     def __init__(self, message, status=None):
         super().__init__(message)
         self.message = message
         self.status = status
 
 
-# --------------------------------------------------------------------------
-# Low-level helper
-# --------------------------------------------------------------------------
-
+# sends request to api and returns json (or text)
 def _request(method, path, *, ok_statuses=(200, 201), **kwargs):
-    """Call the API and return the decoded body (JSON if possible, else text)."""
     url = f'{settings.API_BASE_URL}{path}'
     kwargs.setdefault('timeout', settings.API_TIMEOUT)
     try:
@@ -50,31 +37,23 @@ def _request(method, path, *, ok_statuses=(200, 201), **kwargs):
         body = response.text.strip()
 
     if response.status_code not in ok_statuses:
-        # The API answers errors with plain text ("User not found") or with
-        # ASP.NET problem JSON ({"title": "Not Found", ...}).
         if isinstance(body, dict):
             detail = body.get('title') or ''
         else:
             detail = str(body)[:200]
         logger.info('API error %s: %s %s -> %r', response.status_code, method, path, detail)
+        # don't show server error text to user
         if response.status_code >= 500:
-            # Server crashes come back as raw stack traces: never show those.
             detail = 'The car service had an internal error. Please try again later.'
         raise ApiError(detail or 'The car service returned an error.', status=response.status_code)
     return body
 
 
 def _phone(phone):
-    """Phone numbers go into URL paths, so '+' and friends must be escaped."""
     return quote(str(phone), safe='')
 
 
-# --------------------------------------------------------------------------
-# Cleaning helpers (the live data is messy: nulls, zeros, dead image hosts)
-# --------------------------------------------------------------------------
-
 def _local_photo_url(car_id, index):
-    """URL of our local copy of an uploaded photo, if we have one."""
     folder = Path(settings.MEDIA_ROOT) / 'cars' / str(car_id)
     if folder.is_dir():
         for file in folder.glob(f'{index}.*'):
@@ -82,8 +61,8 @@ def _local_photo_url(car_id, index):
     return None
 
 
+# add photos list and location flag to car
 def clean_car(raw):
-    """Add a few convenience keys to a car dict coming from the API."""
     if not isinstance(raw, dict):
         return None
     car = dict(raw)
@@ -108,22 +87,16 @@ def _clean_cars(raw_list):
     return [car for car in (clean_car(item) for item in raw_list) if car]
 
 
-# --------------------------------------------------------------------------
-# Cars
-# --------------------------------------------------------------------------
-
+# cars
 def get_random_cars():
-    """GET /api/Car -> 12 random cars."""
     return _clean_cars(_request('GET', '/api/Car'))
 
 
 def get_popular_cars():
-    """GET /api/Car/popular -> 4 cars."""
     return _clean_cars(_request('GET', '/api/Car/popular'))
 
 
 def get_car(car_id):
-    """GET /api/Car/{id} -> one car, or None if it does not exist."""
     try:
         return clean_car(_request('GET', f'/api/Car/{int(car_id)}'))
     except ApiError as exc:
@@ -133,11 +106,10 @@ def get_car(car_id):
 
 
 def get_cities():
-    """GET /api/Car/cities -> sorted list of usable city names."""
     raw = _request('GET', '/api/Car/cities')
     cities = set()
     for city in raw if isinstance(raw, list) else []:
-        # Drop nulls and obvious junk such as '12' or '"Tbilisi",'
+        # skip empty and wrong city names
         if isinstance(city, str) and len(city.strip()) >= 3 and city == city.strip() \
                 and all(ch.isalpha() or ch in ' -' for ch in city):
             cities.add(city)
@@ -145,7 +117,6 @@ def get_cities():
 
 
 def filter_cars(*, city=None, start_year=None, end_year=None, capacity=None, page=1, page_size=12):
-    """GET /api/Car/filter. Every filter is optional; any subset works."""
     params = {'pageIndex': page, 'pageSize': page_size}
     if city:
         params['city'] = city
@@ -160,7 +131,7 @@ def filter_cars(*, city=None, start_year=None, end_year=None, capacity=None, pag
     try:
         body = _request('GET', '/api/Car/filter', params=params)
     except ApiError as exc:
-        # With zero matches the API answers 400 "Invalid page index."
+        # api gives 400 when nothing is found
         if exc.status == 400:
             return empty
         raise
@@ -175,25 +146,16 @@ def filter_cars(*, city=None, start_year=None, end_year=None, capacity=None, pag
 
 
 def get_cars_by_owner(phone):
-    """GET /api/Car/byPhone -> cars posted by this phone number."""
     try:
         return _clean_cars(_request('GET', '/api/Car/byPhone', params={'PhoneNumber': phone}))
     except ApiError as exc:
-        if exc.status == 404:  # the API answers 404 when the user has no cars
+        # api gives 404 if user has no cars
+        if exc.status == 404:
             return []
         raise
 
 
 def create_car(fields, photos):
-    """
-    POST /api/Car (multipart/form-data).
-
-    `fields` uses the API's own names (Brand, Model, Year, Price, Capacity,
-    Transmission, CreatedBy, City, CreatedByEmail, FuelCapacity and optionally
-    Latitude, Longitude). `photos` is a list of up to three uploaded files,
-    sent as Image1..Image3. The returned car has an extra key,
-    `photos_accepted`, telling whether the API stored the photos.
-    """
     data = {key: value for key, value in fields.items() if value not in (None, '')}
 
     def send(with_photos):
@@ -208,9 +170,7 @@ def create_car(fields, photos):
         body = send(with_photos=True)
         photos_accepted = True
     except ApiError as exc:
-        # Known problem of the live API: its upload folder is not writable, so
-        # any request that contains a photo crashes with a 500. Save the car
-        # without photos instead (the view keeps local copies of them).
+        # photo upload fails on api side, so send again without photos
         if not photos or exc.status is None or exc.status < 500:
             raise
         logger.warning('API rejected the photo upload (%s); retrying without photos', exc.status)
@@ -222,12 +182,8 @@ def create_car(fields, photos):
     return body
 
 
-# --------------------------------------------------------------------------
-# Users
-# --------------------------------------------------------------------------
-
+# users
 def register_user(*, first_name, last_name, phone, email, password):
-    """POST /api/Users/register."""
     payload = {
         'phoneNumber': phone,
         'password': password,
@@ -245,12 +201,10 @@ def register_user(*, first_name, last_name, phone, email, password):
 
 
 def login_user(*, phone, password):
-    """POST /api/Users/login -> {token, firstName, lastName, role, phoneNumber, email}."""
     try:
         body = _request('POST', '/api/Users/login', json={'phoneNumber': phone, 'password': password})
     except ApiError as exc:
         if exc.status == 400:
-            # "User Not Found!" / "Wrong Password": don't reveal which one.
             raise ApiError('Wrong phone number or password.', status=400)
         raise
     if not isinstance(body, dict) or not body.get('token'):
@@ -259,48 +213,37 @@ def login_user(*, phone, password):
 
 
 def get_favorite_cars(phone):
-    """GET /api/Users/{phoneNumber}/favorite-cars -> list of cars."""
     cars = _clean_cars(_request('GET', f'/api/Users/{_phone(phone)}/favorite-cars'))
+    # remove duplicates
     unique = {}
-    for car in cars:  # the API allows adding the same favourite twice
+    for car in cars:
         unique.setdefault(car.get('id'), car)
     return list(unique.values())
 
 
 def add_favorite_car(phone, car_id):
-    """POST /api/Users/{userId}/favorites/{carId} (userId is the phone number)."""
     _request('POST', f'/api/Users/{_phone(phone)}/favorites/{int(car_id)}')
 
 
-# --------------------------------------------------------------------------
-# Renting
-# --------------------------------------------------------------------------
-
+# rent
 def rent_car(phone, car_id, days):
-    """POST /Purchase/purchase -> ticket with dayPrice and pricePaid."""
     body = _request('POST', '/Purchase/purchase',
                     params={'phoneNumber': phone, 'carId': int(car_id), 'multiplier': int(days)})
     return body if isinstance(body, dict) else {}
 
 
 def get_rentals(phone):
-    """GET /Purchase/{phoneNumber} -> [{carId, carBrand, carModel, city, multiplier, pricePaid}]."""
     body = _request('GET', f'/Purchase/{_phone(phone)}')
-    # With no rentals the API answers 200 with the plain text "No products".
+    # api returns text "No products" if there are no rentals
     return body if isinstance(body, list) else []
 
 
-# --------------------------------------------------------------------------
-# Messages (notifications)
-# --------------------------------------------------------------------------
-
+# messages
 def get_messages(phone):
-    """GET /Message/Messages -> list of message texts, newest first."""
     body = _request('GET', '/Message/Messages', params={'phoneNumber': phone})
     texts = [text for text in body if isinstance(text, str)] if isinstance(body, list) else []
     return list(reversed(texts))
 
 
 def notify_owner(owner_phone, car_id):
-    """POST /Message/Message: tell a car's owner that the car was rented."""
     _request('POST', '/Message/Message', params={'phoneNumber': owner_phone, 'CarId': int(car_id)})

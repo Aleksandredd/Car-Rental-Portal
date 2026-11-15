@@ -1,6 +1,4 @@
-// Add-car page: fill the hidden latitude/longitude inputs from the browser.
-// If the user refuses or the browser cannot do it, the form is simply sent
-// without a location.
+// get location from browser and put it in hidden inputs
 (function () {
   var latInput = document.getElementById('id_latitude');
   var lngInput = document.getElementById('id_longitude');

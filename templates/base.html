@@ -60,7 +60,7 @@
 
 <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
 <script>
-  // Swap broken car photos for the placeholder.
+  // if photo is not loading show default image
   document.addEventListener('error', function (event) {
     var img = event.target;
     if (img.tagName === 'IMG' && img.dataset.fallback && img.src !== img.dataset.fallback) {

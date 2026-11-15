@@ -1,4 +1,4 @@
-// Car page: Mapbox map with a marker at the car's position.
+// mapbox map with car marker
 (function () {
   var el = document.getElementById('map');
   if (!el || typeof mapboxgl === 'undefined') return;
