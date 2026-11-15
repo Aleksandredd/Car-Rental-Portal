@@ -1,0 +1,30 @@
+{% extends 'base.html' %}
+{% block title %}Login | Car Rental Portal{% endblock %}
+
+{% block content %}
+<div class="row justify-content-center">
+  <div class="col-12 col-sm-10 col-md-7 col-lg-5">
+    <div class="card auth-card">
+      <div class="card-body p-4">
+        <h1 class="h3 mb-1">Login</h1>
+        <p class="text-secondary mb-4">Use the phone number you registered with.</p>
+
+        <form method="post" novalidate>
+          {% csrf_token %}
+          {% if next %}<input type="hidden" name="next" value="{{ next }}">{% endif %}
+          {% for error in form.non_field_errors %}
+            <div class="alert alert-danger py-2">{{ error }}</div>
+          {% endfor %}
+          {% include '_form_field.html' with field=form.phone %}
+          {% include '_form_field.html' with field=form.password %}
+          <button type="submit" class="btn btn-accent w-100">Login</button>
+        </form>
+
+        <p class="text-center text-secondary mt-4 mb-0">
+          No account yet? <a href="{% url 'register' %}">Register</a>
+        </p>
+      </div>
+    </div>
+  </div>
+</div>
+{% endblock %}
