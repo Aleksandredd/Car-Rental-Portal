@@ -1,0 +1,11 @@
+{% extends 'base.html' %}
+{% block title %}Not found | Car Rental Portal{% endblock %}
+
+{% block content %}
+<div class="empty-state">
+  <i class="bi bi-signpost-split fs-2 d-block mb-2"></i>
+  <h1 class="h4">Page not found</h1>
+  <p class="mb-3">This car or page does not exist (anymore).</p>
+  <a href="{% url 'home' %}" class="btn btn-accent">Back to home</a>
+</div>
+{% endblock %}
