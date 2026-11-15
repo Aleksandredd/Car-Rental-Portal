@@ -1,0 +1,153 @@
+{% extends 'base.html' %}
+{% load static %}
+{% block title %}{{ car.brand }} {{ car.model }} | Car Rental Portal{% endblock %}
+
+{% block extra_head %}
+  {% if mapbox_token and car.has_location %}
+    <link href="https://api.mapbox.com/mapbox-gl-js/v3.7.0/mapbox-gl.css" rel="stylesheet">
+  {% endif %}
+{% endblock %}
+
+{% block content %}
+<nav aria-label="breadcrumb">
+  <ol class="breadcrumb small">
+    <li class="breadcrumb-item"><a href="{% url 'home' %}">Home</a></li>
+    <li class="breadcrumb-item"><a href="{% url 'filter' %}">Cars</a></li>
+    <li class="breadcrumb-item active" aria-current="page">{{ car.brand }} {{ car.model }}</li>
+  </ol>
+</nav>
+
+<div class="row g-4">
+  <div class="col-lg-7">
+    {# Photo gallery #}
+    {% if car.photos %}
+      <div id="carGallery" class="carousel slide car-gallery">
+        {% if car.photos|length > 1 %}
+          <div class="carousel-indicators">
+            {% for photo in car.photos %}
+              <button type="button" data-bs-target="#carGallery" data-bs-slide-to="{{ forloop.counter0 }}"
+                      {% if forloop.first %}class="active" aria-current="true"{% endif %}
+                      aria-label="Photo {{ forloop.counter }}"></button>
+            {% endfor %}
+          </div>
+        {% endif %}
+        <div class="carousel-inner">
+          {% for photo in car.photos %}
+            <div class="carousel-item {% if forloop.first %}active{% endif %}">
+              <img src="{{ photo }}" data-fallback="{% static 'img/no-photo.svg' %}"
+                   alt="{{ car.brand }} {{ car.model }}, photo {{ forloop.counter }}">
+            </div>
+          {% endfor %}
+        </div>
+        {% if car.photos|length > 1 %}
+          <button class="carousel-control-prev" type="button" data-bs-target="#carGallery" data-bs-slide="prev">
+            <span class="carousel-control-prev-icon" aria-hidden="true"></span>
+            <span class="visually-hidden">Previous photo</span>
+          </button>
+          <button class="carousel-control-next" type="button" data-bs-target="#carGallery" data-bs-slide="next">
+            <span class="carousel-control-next-icon" aria-hidden="true"></span>
+            <span class="visually-hidden">Next photo</span>
+          </button>
+        {% endif %}
+      </div>
+    {% else %}
+      <div class="car-gallery">
+        <img src="{% static 'img/no-photo.svg' %}" alt="No photo available">
+      </div>
+    {% endif %}
+
+    {# Details #}
+    <div class="card mt-4">
+      <div class="card-body">
+        <h2 class="h5 mb-3">Car information</h2>
+        <dl class="row spec-list mb-0">
+          <dt class="col-6 col-sm-4">Brand</dt><dd class="col-6 col-sm-8">{{ car.brand|default:'n/a' }}</dd>
+          <dt class="col-6 col-sm-4">Model</dt><dd class="col-6 col-sm-8">{{ car.model|default:'n/a' }}</dd>
+          <dt class="col-6 col-sm-4">Year</dt><dd class="col-6 col-sm-8">{{ car.year|default:'n/a' }}</dd>
+          <dt class="col-6 col-sm-4">City</dt><dd class="col-6 col-sm-8">{{ car.city|default:'n/a' }}</dd>
+          <dt class="col-6 col-sm-4">Seats</dt><dd class="col-6 col-sm-8">{{ car.capacity|default:'n/a' }}</dd>
+          <dt class="col-6 col-sm-4">Transmission</dt><dd class="col-6 col-sm-8">{{ car.transmission|default:'n/a' }}</dd>
+          <dt class="col-6 col-sm-4">Fuel tank</dt>
+          <dd class="col-6 col-sm-8">{% if car.fuelCapacity %}{{ car.fuelCapacity }} L{% else %}n/a{% endif %}</dd>
+          <dt class="col-6 col-sm-4">Owner phone</dt><dd class="col-6 col-sm-8">{{ car.createdBy|default:'n/a' }}</dd>
+          {% if car.createdByEmail %}
+            <dt class="col-6 col-sm-4">Owner email</dt><dd class="col-6 col-sm-8 text-break">{{ car.createdByEmail }}</dd>
+          {% endif %}
+        </dl>
+      </div>
+    </div>
+
+    {# Map #}
+    {% if car.has_location %}
+      <div class="card mt-4">
+        <div class="card-body">
+          <h2 class="h5 mb-3">Location</h2>
+          {% if mapbox_token %}
+            <div id="map" class="car-map" data-lat="{{ car.latitude|stringformat:'f' }}"
+                 data-lng="{{ car.longitude|stringformat:'f' }}" data-token="{{ mapbox_token }}"></div>
+          {% else %}
+            <p class="text-secondary mb-0">
+              <i class="bi bi-geo-alt me-1"></i>{{ car.latitude|floatformat:5 }}, {{ car.longitude|floatformat:5 }}
+            </p>
+          {% endif %}
+        </div>
+      </div>
+    {% endif %}
+  </div>
+
+  <div class="col-lg-5">
+    <div class="card rent-card sticky-lg-top">
+      <div class="card-body p-4">
+        <h1 class="h3 mb-1">{{ car.brand }} {{ car.model }}</h1>
+        <p class="text-secondary mb-3">
+          {{ car.year|default:'' }}{% if car.year and car.city %} &middot; {% endif %}{{ car.city|default:'' }}
+        </p>
+        <p class="mb-4">
+          <span class="car-price fs-3">{{ car.price|default:0|floatformat:'-2' }} GEL</span>
+          <span class="text-secondary">/ day</span>
+        </p>
+
+        {% if is_owner %}
+          <div class="alert alert-info mb-0">This is your car. Other users can rent it from this page.</div>
+        {% elif current_user %}
+          <form method="post" action="{% url 'car_rent' car.id %}" id="rentForm"
+                data-price="{{ car.price|default:0|stringformat:'f' }}">
+            {% csrf_token %}
+            <label for="days" class="form-label">Number of days</label>
+            <select name="days" id="days" class="form-select mb-3">
+              {% for day in day_options %}
+                <option value="{{ day }}">{{ day }} day{{ day|pluralize }}</option>
+              {% endfor %}
+            </select>
+            <div class="total-box d-flex justify-content-between align-items-center mb-3">
+              <span>Total price</span>
+              <strong class="fs-5"><span id="totalPrice">{{ car.price|default:0|floatformat:'-2' }}</span> GEL</strong>
+            </div>
+            <button type="submit" class="btn btn-accent btn-lg w-100">
+              <i class="bi bi-key me-2"></i>Rent
+            </button>
+          </form>
+          <form method="post" action="{% url 'car_approve' car.id %}" class="mt-2">
+            {% csrf_token %}
+            <button type="submit" class="btn btn-outline-secondary w-100">
+              <i class="bi bi-check2-circle me-2"></i>Approve
+            </button>
+          </form>
+        {% else %}
+          <a href="{% url 'login' %}?next={{ request.path|urlencode }}" class="btn btn-accent btn-lg w-100">
+            Login to rent
+          </a>
+        {% endif %}
+      </div>
+    </div>
+  </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+  <script src="{% static 'js/rent.js' %}"></script>
+  {% if mapbox_token and car.has_location %}
+    <script src="https://api.mapbox.com/mapbox-gl-js/v3.7.0/mapbox-gl.js"></script>
+    <script src="{% static 'js/map.js' %}"></script>
+  {% endif %}
+{% endblock %}
