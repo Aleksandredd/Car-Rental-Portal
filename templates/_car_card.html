@@ -1,0 +1,25 @@
+{% load static %}
+{# Reusable car card. Usage: {% include '_car_card.html' with car=car %} #}
+<div class="card car-card h-100">
+  <a href="{% url 'car_detail' car.id %}" class="car-card-photo" tabindex="-1" aria-hidden="true">
+    <img src="{% if car.cover %}{{ car.cover }}{% else %}{% static 'img/no-photo.svg' %}{% endif %}"
+         data-fallback="{% static 'img/no-photo.svg' %}"
+         alt="{{ car.brand|default:'Car' }} {{ car.model|default:'' }}" loading="lazy">
+  </a>
+  <div class="card-body d-flex flex-column">
+    <h3 class="h6 card-title mb-1">
+      <a href="{% url 'car_detail' car.id %}" class="stretched-link text-reset text-decoration-none">
+        {{ car.brand|default:'Unknown brand' }} {{ car.model|default:'' }}
+      </a>
+    </h3>
+    <p class="text-secondary small mb-3">
+      <i class="bi bi-calendar3 me-1"></i>{{ car.year|default:'Year n/a' }}
+      <span class="mx-1">&middot;</span>
+      <i class="bi bi-geo-alt me-1"></i>{{ car.city|default:'City n/a' }}
+    </p>
+    <p class="mt-auto mb-0">
+      <span class="car-price">{{ car.price|default:0|floatformat:'-2' }} GEL</span>
+      <span class="text-secondary small">/ day</span>
+    </p>
+  </div>
+</div>

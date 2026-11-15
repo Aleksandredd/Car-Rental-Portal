@@ -1,0 +1,36 @@
+{% extends 'base.html' %}
+{% block title %}Car Rental Portal{% endblock %}
+
+{% block content %}
+<section class="hero rounded-4 p-4 p-md-5 mb-5">
+  <h1 class="display-6 fw-semibold mb-2">Find a car for your next trip</h1>
+  <p class="lead mb-4">Rent directly from owners across Georgia, or list your own car.</p>
+  <a href="{% url 'filter' %}" class="btn btn-accent btn-lg"><i class="bi bi-search me-2"></i>Find a car</a>
+</section>
+
+<section class="mb-5">
+  <h2 class="h4 mb-3">Popular cars</h2>
+  {% if popular_cars %}
+    <div class="row row-cols-1 row-cols-sm-2 row-cols-lg-4 g-3">
+      {% for car in popular_cars %}
+        <div class="col">{% include '_car_card.html' with car=car %}</div>
+      {% endfor %}
+    </div>
+  {% else %}
+    <div class="empty-state">No popular cars to show right now.</div>
+  {% endif %}
+</section>
+
+<section>
+  <h2 class="h4 mb-3">Random cars</h2>
+  {% if random_cars %}
+    <div class="row row-cols-1 row-cols-sm-2 row-cols-lg-4 g-3">
+      {% for car in random_cars %}
+        <div class="col">{% include '_car_card.html' with car=car %}</div>
+      {% endfor %}
+    </div>
+  {% else %}
+    <div class="empty-state">No cars found.</div>
+  {% endif %}
+</section>
+{% endblock %}
