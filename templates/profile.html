@@ -4,12 +4,12 @@
 {% block content %}
 <div class="card profile-header mb-4">
   <div class="card-body d-flex align-items-center gap-3 p-4">
-    <div class="avatar" aria-hidden="true">{{ current_user.first_name|slice:':1'|upper }}{{ current_user.last_name|slice:':1'|upper }}</div>
+    <div class="avatar">{{ user.first_name|slice:':1'|upper }}{{ user.last_name|slice:':1'|upper }}</div>
     <div>
-      <h1 class="h3 mb-1">{{ current_user.first_name }} {{ current_user.last_name }}</h1>
+      <h1 class="h3 mb-1">{{ user.first_name }} {{ user.last_name }}</h1>
       <p class="text-secondary mb-0">
-        <i class="bi bi-telephone me-1"></i>{{ current_user.phone }}
-        {% if current_user.email %}<span class="mx-1">&middot;</span><span class="text-break">{{ current_user.email }}</span>{% endif %}
+        <i class="bi bi-telephone me-1"></i>{{ user.username }}
+        <span class="mx-1">&middot;</span><span class="text-break">{{ user.email }}</span>
       </p>
     </div>
   </div>
@@ -24,17 +24,17 @@
           <div class="card rental-card h-100">
             <div class="card-body">
               <h3 class="h6 mb-3">
-                {% if rental.car_id %}
-                  <a href="{% url 'car_detail' rental.car_id %}" class="stretched-link text-reset text-decoration-none">{{ rental.name }}</a>
-                {% else %}{{ rental.name }}{% endif %}
+                <a href="{% url 'car_detail' rental.car.id %}" class="stretched-link text-reset text-decoration-none">
+                  {{ rental.car.brand }} {{ rental.car.model }}
+                </a>
               </h3>
               <dl class="row small mb-0">
                 <dt class="col-6 text-secondary fw-normal">City</dt>
-                <dd class="col-6 text-end">{{ rental.city|default:'n/a' }}</dd>
+                <dd class="col-6 text-end">{{ rental.car.city }}</dd>
                 <dt class="col-6 text-secondary fw-normal">Rental days</dt>
                 <dd class="col-6 text-end">{{ rental.days }}</dd>
                 <dt class="col-6 text-secondary fw-normal">Amount paid</dt>
-                <dd class="col-6 text-end mb-0 fw-semibold">{{ rental.paid|default:0|floatformat:'-2' }} GEL</dd>
+                <dd class="col-6 text-end mb-0 fw-semibold">{{ rental.total_price }} GEL</dd>
               </dl>
             </div>
           </div>
@@ -57,7 +57,7 @@
       {% endfor %}
     </div>
   {% else %}
-    <div class="empty-state">No approved cars yet. Open a car and press "Approve" to save it here.</div>
+    <div class="empty-state">No approved cars yet. Open a car and press "Approve".</div>
   {% endif %}
 </section>
 

@@ -34,35 +34,37 @@
   </div>
 </form>
 
-{% if cars %}
+{% if page.object_list %}
   <p class="text-secondary">
-    {{ total_items }} car{{ total_items|pluralize }} found{% if total_pages > 1 %}, page {{ page }} of {{ total_pages }}{% endif %}
+    {{ page.paginator.count }} car{{ page.paginator.count|pluralize }} found{% if page.paginator.num_pages > 1 %}, page {{ page.number }} of {{ page.paginator.num_pages }}{% endif %}
   </p>
   <div class="row row-cols-1 row-cols-sm-2 row-cols-lg-4 g-3">
-    {% for car in cars %}
+    {% for car in page.object_list %}
       <div class="col">{% include '_car_card.html' with car=car %}</div>
     {% endfor %}
   </div>
 
-  {% if total_pages > 1 %}
-    <nav class="mt-4" aria-label="Result pages">
+  {% if page.paginator.num_pages > 1 %}
+    <nav class="mt-4">
       <ul class="pagination justify-content-center">
-        <li class="page-item {% if not has_previous %}disabled{% endif %}">
-          <a class="page-link" href="?{% if base_query %}{{ base_query }}&amp;{% endif %}page={{ previous_page }}">Previous</a>
-        </li>
-        <li class="page-item disabled"><span class="page-link">{{ page }} / {{ total_pages }}</span></li>
-        <li class="page-item {% if not has_next %}disabled{% endif %}">
-          <a class="page-link" href="?{% if base_query %}{{ base_query }}&amp;{% endif %}page={{ next_page }}">Next</a>
-        </li>
+        {% if page.has_previous %}
+          <li class="page-item">
+            <a class="page-link" href="?{% if params %}{{ params }}&amp;{% endif %}page={{ page.previous_page_number }}">Previous</a>
+          </li>
+        {% endif %}
+        <li class="page-item disabled"><span class="page-link">{{ page.number }} / {{ page.paginator.num_pages }}</span></li>
+        {% if page.has_next %}
+          <li class="page-item">
+            <a class="page-link" href="?{% if params %}{{ params }}&amp;{% endif %}page={{ page.next_page_number }}">Next</a>
+          </li>
+        {% endif %}
       </ul>
     </nav>
   {% endif %}
-{% elif form.errors %}
-  <div class="empty-state">Please fix the filter values above.</div>
 {% else %}
   <div class="empty-state">
     <i class="bi bi-search fs-2 d-block mb-2"></i>
-    No cars found{% if submitted %} for these filters. Try removing one of them{% endif %}.
+    No cars found.
   </div>
 {% endif %}
 {% endblock %}

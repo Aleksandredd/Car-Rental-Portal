@@ -6,18 +6,21 @@
   <div class="col-12 col-lg-8">
     <h1 class="h3 mb-3">Notifications</h1>
     {% if notifications %}
-      <ul class="list-group notification-list">
-        {% for text in notifications %}
+      <ul class="list-group">
+        {% for notification in notifications %}
           <li class="list-group-item d-flex gap-3 align-items-start">
             <i class="bi bi-bell-fill text-accent mt-1"></i>
-            <span>{{ text }}</span>
+            <div>
+              {{ notification.text }}
+              <div class="small text-secondary">{{ notification.created_at|date:'d.m.Y H:i' }}</div>
+            </div>
           </li>
         {% endfor %}
       </ul>
     {% else %}
       <div class="empty-state">
         <i class="bi bi-bell-slash fs-2 d-block mb-2"></i>
-        No notifications yet. You will get one when someone rents a car you posted.
+        No notifications yet.
       </div>
     {% endif %}
   </div>

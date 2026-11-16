@@ -163,6 +163,12 @@ body {
   border-left: 4px solid var(--accent);
 }
 
+/* red border for inputs with errors */
+.has-error .form-control,
+.has-error .form-select {
+  border-color: #dc3545;
+}
+
 /* auth */
 .auth-card {
   box-shadow: 0 0.6rem 1.6rem rgba(22, 32, 46, 0.07);

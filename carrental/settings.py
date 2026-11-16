@@ -5,23 +5,19 @@ from dotenv import load_dotenv
 
 BASE_DIR = Path(__file__).resolve().parent.parent
 
+# secrets are in .env file
 load_dotenv(BASE_DIR / '.env')
 
+SECRET_KEY = os.getenv('SECRET_KEY', 'dev-secret-key')
+DEBUG = os.getenv('DEBUG', 'False') == 'True'
+ALLOWED_HOSTS = ['localhost', '127.0.0.1']
 
-def env_bool(name, default=False):
-    return os.getenv(name, str(default)).strip().lower() in ('1', 'true', 'yes', 'on')
-
-
-SECRET_KEY = os.getenv('SECRET_KEY', 'dev-only-insecure-key-change-me')
-DEBUG = env_bool('DEBUG', False)
-ALLOWED_HOSTS = [h.strip() for h in os.getenv('ALLOWED_HOSTS', 'localhost,127.0.0.1').split(',') if h.strip()]
-
-# rentcar api
-API_BASE_URL = os.getenv('API_BASE_URL', 'https://rentcar.stepprojects.ge').rstrip('/')
-API_TIMEOUT = 15
 MAPBOX_TOKEN = os.getenv('MAPBOX_TOKEN', '')
 
 INSTALLED_APPS = [
+    'django.contrib.admin',
+    'django.contrib.auth',
+    'django.contrib.contenttypes',
     'django.contrib.sessions',
     'django.contrib.messages',
     'django.contrib.staticfiles',
@@ -33,6 +29,7 @@ MIDDLEWARE = [
     'django.contrib.sessions.middleware.SessionMiddleware',
     'django.middleware.common.CommonMiddleware',
     'django.middleware.csrf.CsrfViewMiddleware',
+    'django.contrib.auth.middleware.AuthenticationMiddleware',
     'django.contrib.messages.middleware.MessageMiddleware',
     'django.middleware.clickjacking.XFrameOptionsMiddleware',
 ]
@@ -47,8 +44,8 @@ TEMPLATES = [
         'OPTIONS': {
             'context_processors': [
                 'django.template.context_processors.request',
+                'django.contrib.auth.context_processors.auth',
                 'django.contrib.messages.context_processors.messages',
-                'core.context_processors.current_user',
             ],
         },
     },
@@ -56,7 +53,6 @@ TEMPLATES = [
 
 WSGI_APPLICATION = 'carrental.wsgi.application'
 
-# database is used only for sessions
 DATABASES = {
     'default': {
         'ENGINE': 'django.db.backends.sqlite3',
@@ -65,10 +61,9 @@ DATABASES = {
 }
 DEFAULT_AUTO_FIELD = 'django.db.models.BigAutoField'
 
-# login for 1 day
-SESSION_COOKIE_AGE = 60 * 60 * 24
-SESSION_COOKIE_HTTPONLY = True
-MESSAGE_STORAGE = 'django.contrib.messages.storage.session.SessionStorage'
+# our user model (phone number is username)
+AUTH_USER_MODEL = 'core.User'
+LOGIN_URL = 'login'
 
 LANGUAGE_CODE = 'en-us'
 TIME_ZONE = 'Asia/Tbilisi'
@@ -81,7 +76,3 @@ STATICFILES_DIRS = [BASE_DIR / 'static']
 # uploaded car photos
 MEDIA_URL = 'media/'
 MEDIA_ROOT = BASE_DIR / 'media'
-
-# max photo size 5 MB
-MAX_PHOTO_SIZE = 5 * 1024 * 1024
-DATA_UPLOAD_MAX_MEMORY_SIZE = 20 * 1024 * 1024
