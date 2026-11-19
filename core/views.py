@@ -1,11 +1,15 @@
+import datetime
+
 from django.conf import settings
 from django.contrib import messages
 from django.contrib.auth import authenticate, login, logout
 from django.contrib.auth.decorators import login_required
 from django.core.paginator import Paginator
+from django.db import transaction
 from django.db.models import Count
 from django.shortcuts import get_object_or_404, redirect, render
 
+from .choices import CAR_BRANDS
 from .forms import MAX_DAYS, CarForm, FilterForm, LoginForm, RegisterForm, RentForm
 from .models import Car, Notification, Rental, User
 
@@ -104,10 +108,15 @@ def car_detail(request, car_id):
     is_approved = False
     if request.user.is_authenticated:
         is_approved = car.approved_by.filter(id=request.user.id).exists()
+    today = datetime.date.today()
+    # days when the car is already rented
+    busy = car.rentals.filter(end_date__gte=today).order_by('start_date')
     return render(request, 'car_detail.html', {
         'car': car,
         'is_approved': is_approved,
-        'days': range(1, MAX_DAYS + 1),
+        'busy': busy,
+        'today': today,
+        'max_days': MAX_DAYS,
         'mapbox_token': settings.MAPBOX_TOKEN,
     })
 
@@ -122,27 +131,39 @@ def car_rent(request, car_id):
         messages.warning(request, 'You can not rent your own car.')
         return redirect('car_detail', car_id=car.id)
 
-    form = RentForm(request.POST)
+    form = RentForm(request.POST, car=car)
     if not form.is_valid():
-        messages.error(request, f'Number of days must be from 1 to {MAX_DAYS}.')
+        for error in form.non_field_errors():
+            messages.error(request, error)
         return redirect('car_detail', car_id=car.id)
 
+    start = form.cleaned_data['start_date']
+    end = form.cleaned_data['end_date']
     days = form.cleaned_data['days']
     total = days * car.price
-    Rental.objects.create(user=request.user, car=car, days=days, total_price=total)
+    dates = f'{start:%d.%m.%Y} - {end:%d.%m.%Y}'
 
-    # notification for the owner and for users who approved this car
-    Notification.objects.create(
-        user=car.owner,
-        text=f'Your car {car.brand} {car.model} was rented for {days} days.',
-    )
-    for user in car.approved_by.exclude(id=request.user.id):
+    # check and save in one transaction, so two users can not rent the same days
+    with transaction.atomic():
+        if car.is_busy(start, end):
+            messages.error(request, 'Sorry, this car is already rented on some of these days. Choose other dates.')
+            return redirect('car_detail', car_id=car.id)
+
+        Rental.objects.create(user=request.user, car=car, start_date=start, end_date=end,
+                              days=days, total_price=total)
+
+        # notification for the owner and for users who approved this car
         Notification.objects.create(
-            user=user,
-            text=f'{car.brand} {car.model} which you approved was rented.',
+            user=car.owner,
+            text=f'Your car {car.brand} {car.model} was rented for {dates} ({days} days).',
         )
+        for user in car.approved_by.exclude(id=request.user.id):
+            Notification.objects.create(
+                user=user,
+                text=f'{car.brand} {car.model} which you approved was rented for {dates}.',
+            )
 
-    messages.success(request, f'You rented {car.brand} {car.model} for {days} days. Total price: {total} GEL.')
+    messages.success(request, f'You rented {car.brand} {car.model} for {dates} ({days} days). Total price: {total} GEL.')
     return redirect('profile')
 
 
@@ -170,8 +191,7 @@ def car_add(request):
         messages.success(request, 'Your car was added.')
         return redirect('car_detail', car_id=car.id)
 
-    cities = Car.objects.values_list('city', flat=True).distinct()
-    return render(request, 'car_add.html', {'form': form, 'cities': cities})
+    return render(request, 'car_add.html', {'form': form, 'car_brands': CAR_BRANDS})
 
 
 @login_required

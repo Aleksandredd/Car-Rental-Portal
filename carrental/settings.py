@@ -57,6 +57,9 @@ DATABASES = {
     'default': {
         'ENGINE': 'django.db.backends.sqlite3',
         'NAME': BASE_DIR / 'db.sqlite3',
+        # transaction locks the database at the start,
+        # so two users can not rent the same days at the same moment
+        'OPTIONS': {'transaction_mode': 'IMMEDIATE'},
     }
 }
 DEFAULT_AUTO_FIELD = 'django.db.models.BigAutoField'

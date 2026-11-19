@@ -61,6 +61,10 @@
           <dt class="col-6 col-sm-4">Seats</dt><dd class="col-6 col-sm-8">{{ car.capacity }}</dd>
           <dt class="col-6 col-sm-4">Transmission</dt><dd class="col-6 col-sm-8">{{ car.get_transmission_display }}</dd>
           <dt class="col-6 col-sm-4">Fuel tank</dt><dd class="col-6 col-sm-8">{{ car.fuel_capacity }} L</dd>
+          {% if car.available_from %}
+            <dt class="col-6 col-sm-4">Available</dt>
+            <dd class="col-6 col-sm-8">{{ car.available_from|date:'d.m.Y' }} - {{ car.available_to|date:'d.m.Y' }}</dd>
+          {% endif %}
           <dt class="col-6 col-sm-4">Owner</dt>
           <dd class="col-6 col-sm-8">{{ car.owner.first_name }} {{ car.owner.last_name }}</dd>
           <dt class="col-6 col-sm-4">Owner phone</dt><dd class="col-6 col-sm-8">{{ car.owner.username }}</dd>
@@ -108,15 +112,35 @@
         {% elif user.is_authenticated %}
           <form method="post" action="{% url 'car_rent' car.id %}" id="rentForm" data-price="{{ car.price }}">
             {% csrf_token %}
-            <label for="days" class="form-label">Number of days</label>
-            <select name="days" id="days" class="form-select mb-3">
-              {% for day in days %}
-                <option value="{{ day }}">{{ day }} day{{ day|pluralize }}</option>
-              {% endfor %}
-            </select>
+            <div class="row g-2 mb-3">
+              <div class="col-6">
+                <label for="start_date" class="form-label">From</label>
+                <input type="date" name="start_date" id="start_date" class="form-control" required
+                       min="{% if car.available_from and car.available_from > today %}{{ car.available_from|date:'Y-m-d' }}{% else %}{{ today|date:'Y-m-d' }}{% endif %}"
+                       {% if car.available_to %}max="{{ car.available_to|date:'Y-m-d' }}"{% endif %}>
+              </div>
+              <div class="col-6">
+                <label for="end_date" class="form-label">To</label>
+                <input type="date" name="end_date" id="end_date" class="form-control" required
+                       min="{% if car.available_from and car.available_from > today %}{{ car.available_from|date:'Y-m-d' }}{% else %}{{ today|date:'Y-m-d' }}{% endif %}"
+                       {% if car.available_to %}max="{{ car.available_to|date:'Y-m-d' }}"{% endif %}>
+              </div>
+            </div>
+
+            {% if busy %}
+              <div class="small mb-3">
+                <div class="text-secondary mb-1">Already rented on these days:</div>
+                {% for rental in busy %}
+                  <span class="badge text-bg-light border me-1 mb-1">
+                    {{ rental.start_date|date:'d.m.Y' }} - {{ rental.end_date|date:'d.m.Y' }}
+                  </span>
+                {% endfor %}
+              </div>
+            {% endif %}
+
             <div class="total-box d-flex justify-content-between align-items-center mb-3">
-              <span>Total price</span>
-              <strong class="fs-5"><span id="totalPrice">{{ car.price }}</span> GEL</strong>
+              <span><span id="daysCount">0</span> days</span>
+              <strong class="fs-5"><span id="totalPrice">0</span> GEL</strong>
             </div>
             <button type="submit" class="btn btn-accent btn-lg w-100">
               <i class="bi bi-key me-2"></i>Rent

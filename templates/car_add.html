@@ -29,9 +29,12 @@
           <div class="col-sm-6">{% include '_form_field.html' with field=form.city %}</div>
           <div class="col-sm-6">{% include '_form_field.html' with field=form.fuel_capacity %}</div>
         </div>
-        <datalist id="city-list">
-          {% for city in cities %}<option value="{{ city }}">{% endfor %}
-        </datalist>
+
+        <h2 class="h6 mt-2">When can the car be rented?</h2>
+        <div class="row">
+          <div class="col-sm-6">{% include '_form_field.html' with field=form.available_from %}</div>
+          <div class="col-sm-6">{% include '_form_field.html' with field=form.available_to %}</div>
+        </div>
 
         <h2 class="h6 mt-2">Photos</h2>
         <p class="form-text mt-0">Three photos, .png, .jpg or .jpeg only.</p>
@@ -54,5 +57,7 @@
 {% endblock %}
 
 {% block extra_js %}
+  {{ car_brands|json_script:'car-brands' }}
+  <script src="{% static 'js/car_form.js' %}"></script>
   <script src="{% static 'js/geolocation.js' %}"></script>
 {% endblock %}

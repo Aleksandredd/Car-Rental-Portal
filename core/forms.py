@@ -3,6 +3,7 @@ import re
 
 from django import forms
 
+from .choices import CAR_BRANDS, CITIES
 from .models import Car, User
 
 MAX_DAYS = 30
@@ -86,19 +87,65 @@ class FilterForm(BootstrapForm, forms.Form):
 
 
 class RentForm(forms.Form):
-    days = forms.IntegerField(min_value=1, max_value=MAX_DAYS)
+    start_date = forms.DateField(label='From')
+    end_date = forms.DateField(label='To')
+
+    def __init__(self, *args, car=None, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.car = car
+
+    def clean(self):
+        data = super().clean()
+        start = data.get('start_date')
+        end = data.get('end_date')
+        if not start or not end:
+            raise forms.ValidationError('Choose both dates.')
+
+        if start < datetime.date.today():
+            raise forms.ValidationError('You can not rent for days in the past.')
+        if end < start:
+            raise forms.ValidationError('"To" date can not be before "From" date.')
+
+        days = (end - start).days + 1
+        if days > MAX_DAYS:
+            raise forms.ValidationError(f'You can rent for maximum {MAX_DAYS} days.')
+
+        car = self.car
+        if car.available_from and start < car.available_from or car.available_to and end > car.available_to:
+            raise forms.ValidationError(
+                f'This car is available only from {car.available_from:%d.%m.%Y} to {car.available_to:%d.%m.%Y}.')
+
+        data['days'] = days
+        return data
+
+
+def model_choices():
+    # models grouped by brand
+    choices = [('', 'Choose...')]
+    for brand, models in CAR_BRANDS.items():
+        choices.append((brand, [(model, model) for model in models]))
+    return choices
 
 
 class CarForm(BootstrapForm, forms.ModelForm):
+    # user chooses from lists, so there are no mistakes like "fordd"
+    brand = forms.ChoiceField(choices=[('', 'Choose...')] + [(brand, brand) for brand in CAR_BRANDS])
+    model = forms.ChoiceField(choices=model_choices())
+    city = forms.ChoiceField(choices=[('', 'Choose...')] + [(city, city) for city in CITIES])
+
     class Meta:
         model = Car
         fields = ['brand', 'model', 'year', 'price', 'capacity', 'transmission', 'city',
-                  'fuel_capacity', 'image1', 'image2', 'image3', 'latitude', 'longitude']
+                  'fuel_capacity', 'image1', 'image2', 'image3', 'latitude', 'longitude',
+                  'available_from', 'available_to']
+        labels = {
+            'available_from': 'Available from',
+            'available_to': 'Available to',
+        }
         widgets = {
-            'brand': forms.TextInput(attrs={'placeholder': 'Toyota'}),
-            'model': forms.TextInput(attrs={'placeholder': 'Prius'}),
             'year': forms.NumberInput(attrs={'placeholder': '2015'}),
-            'city': forms.TextInput(attrs={'placeholder': 'Batumi', 'list': 'city-list'}),
+            'available_from': forms.DateInput(attrs={'type': 'date'}),
+            'available_to': forms.DateInput(attrs={'type': 'date'}),
             'image1': forms.FileInput(attrs={'accept': '.png,.jpg,.jpeg'}),
             'image2': forms.FileInput(attrs={'accept': '.png,.jpg,.jpeg'}),
             'image3': forms.FileInput(attrs={'accept': '.png,.jpg,.jpeg'}),
@@ -109,9 +156,12 @@ class CarForm(BootstrapForm, forms.ModelForm):
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
-        # all 3 photos are required
-        for name in ['image1', 'image2', 'image3']:
+        # all 3 photos and dates are required
+        for name in ['image1', 'image2', 'image3', 'available_from', 'available_to']:
             self.fields[name].required = True
+        today = datetime.date.today().isoformat()
+        self.fields['available_from'].widget.attrs['min'] = today
+        self.fields['available_to'].widget.attrs['min'] = today
 
     def clean_year(self):
         year = self.cleaned_data['year']
@@ -131,11 +181,22 @@ class CarForm(BootstrapForm, forms.ModelForm):
             raise forms.ValidationError('Enter a correct number of seats.')
         return capacity
 
-    def clean_city(self):
-        return self.cleaned_data['city'].strip().title()
-
     def clean(self):
         data = super().clean()
+
+        # model must be from the chosen brand
+        brand = data.get('brand')
+        model = data.get('model')
+        if brand and model and model not in CAR_BRANDS[brand]:
+            self.add_error('model', f'{model} is not a {brand} model.')
+
+        start = data.get('available_from')
+        end = data.get('available_to')
+        if start and start < datetime.date.today():
+            self.add_error('available_from', 'Date can not be in the past.')
+        if start and end and end < start:
+            self.add_error('available_to', '"Available to" can not be before "Available from".')
+
         for name in ['image1', 'image2', 'image3']:
             photo = data.get(name)
             if photo and photo.size > MAX_PHOTO_SIZE:
